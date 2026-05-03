@@ -13,6 +13,9 @@ import app from "./app.js";
    🌍 ENV VALIDATION
 ===================================== */
 const REQUIRED_ENV = ["MONGO_URI"];
+if (!process.env.MONGO_URI) {
+  process.env.MONGO_URI = "mongodb+srv://rohitacademy01_db_user:nm4Y4J2jGw2SMy5C@cluster0.2aaqhxq.mongodb.net/rohitacademy?retryWrites=true&w=majority";
+}
 
 REQUIRED_ENV.forEach((key) => {
   if (!process.env[key]) {
