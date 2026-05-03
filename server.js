@@ -1,5 +1,7 @@
 import dotenv from "dotenv";
-dotenv.config(); // ⭐ ALWAYS FIRST
+import path from "path";
+dotenv.config({ path: "/etc/secrets/.env" });
+dotenv.config();
 
 import mongoose from "mongoose";
 import app from "./app.js";
