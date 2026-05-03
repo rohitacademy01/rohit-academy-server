@@ -3,6 +3,9 @@ import path from "path";
 dotenv.config({ path: "/etc/secrets/.env" });
 dotenv.config();
 
+console.log("🔍 ENV CHECK:", Object.keys(process.env).filter(k => k.includes('MONGO')));
+console.log("🔍 MONGO_URI:", process.env.MONGO_URI ? "EXISTS" : "MISSING");
+
 import mongoose from "mongoose";
 import app from "./app.js";
 
