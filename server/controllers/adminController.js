@@ -1,11 +1,62 @@
 import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+
 import User from "../models/User.js";
 import Class from "../models/Class.js";
 import Subject from "../models/Subject.js";
 import Material from "../models/Material.js";
 import Order from "../models/Order.js";
 import Batch from "../models/Batch.js";
+
 import logger from "../utils/logger.js";
+
+/* =====================================
+   🔐 ADMIN LOGIN
+===================================== */
+export const adminLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // check input
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: "Email & password required" });
+    }
+
+    // find admin user
+    const admin = await User.findOne({ email, role: "admin" });
+    if (!admin) {
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
+    }
+
+    // compare password
+    const isMatch = await bcrypt.compare(password, admin.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
+    }
+
+    // generate token
+    const token = jwt.sign(
+      { id: admin._id, role: admin.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      success: true,
+      token,
+      admin: {
+        id: admin._id,
+        name: admin.name,
+        email: admin.email,
+      },
+    });
+
+  } catch (error) {
+    logger.error("Admin login error:", error);
+    res.status(500).json({ success: false, message: "Login failed" });
+  }
+};
 
 /* =====================================
    📊 ADMIN STATS
@@ -55,7 +106,7 @@ export const getAdminStats = async (req, res) => {
 };
 
 /* =====================================
-   👥 GET ALL USERS
+   👥 USERS
 ===================================== */
 export const getAllUsers = async (req, res) => {
   try {
@@ -64,7 +115,7 @@ export const getAllUsers = async (req, res) => {
 
     const [users, total] = await Promise.all([
       User.find({ role: "user" })
-        .select("-password -loginAttempts -lockUntil -resetPasswordToken -resetPasswordExpire")
+        .select("-password")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -72,29 +123,37 @@ export const getAllUsers = async (req, res) => {
       User.countDocuments({ role: "user" }),
     ]);
 
-    res.json({ success: true, data: users, pagination: { total, page, pages: Math.ceil(total / limit) } });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Server Error" });
+    res.json({
+      success: true,
+      data: users,
+      pagination: { total, page, pages: Math.ceil(total / limit) }
+    });
+
+  } catch {
+    res.status(500).json({ success: false });
   }
 };
 
 /* =====================================
-   🔁 TOGGLE BLOCK USER
+   🚫 BLOCK USER
 ===================================== */
 export const toggleUserBlock = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: "Invalid ID" });
-    if (req.user?._id?.toString() === id || req.user?.id?.toString() === id) {
-      return res.status(400).json({ success: false, message: "Cannot modify yourself" });
-    }
+
+    if (!mongoose.Types.ObjectId.isValid(id))
+      return res.status(400).json({ success: false });
+
     const user = await User.findById(id);
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    if (!user) return res.status(404).json({ success: false });
+
     user.isBlocked = !user.isBlocked;
     await user.save();
-    res.json({ success: true, message: `User ${user.isBlocked ? "blocked" : "unblocked"}` });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Server Error" });
+
+    res.json({ success: true });
+
+  } catch {
+    res.status(500).json({ success: false });
   }
 };
 
@@ -104,70 +163,66 @@ export const toggleUserBlock = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: "Invalid ID" });
+
+    if (!mongoose.Types.ObjectId.isValid(id))
+      return res.status(400).json({ success: false });
+
     await User.findByIdAndUpdate(id, { isBlocked: true });
-    res.json({ success: true, message: "User deactivated" });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Server Error" });
+
+    res.json({ success: true });
+
+  } catch {
+    res.status(500).json({ success: false });
   }
 };
 
 /* =====================================
-   📄 GET ALL MATERIALS
+   📄 MATERIALS
 ===================================== */
 export const getAllMaterials = async (req, res) => {
   try {
-    const { page = 1, limit = 20 } = req.pagination || {};
-    const skip = (page - 1) * limit;
-    const [materials, total] = await Promise.all([
-      Material.find()
-        .populate("classId", "name")
-        .populate("streamId", "name")
-        .populate("subjectId", "name")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
-      Material.countDocuments(),
-    ]);
-    res.json({ success: true, data: materials, pagination: { total, page, pages: Math.ceil(total / limit) } });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to fetch materials" });
+    const materials = await Material.find()
+      .populate("classId subjectId")
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, data: materials });
+
+  } catch {
+    res.status(500).json({ success: false });
   }
 };
 
 /* =====================================
-   📦 GET ALL ORDERS
+   📦 ORDERS
 ===================================== */
 export const getAllOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 20 } = req.pagination || {};
-    const skip = (page - 1) * limit;
-    const [orders, total] = await Promise.all([
-      Order.find()
-        .populate("user", "name phone email")
-        .populate("batch", "name price")
-        .populate("materials", "title price")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
-      Order.countDocuments(),
-    ]);
-    res.json({ success: true, data: orders, pagination: { total, page, pages: Math.ceil(total / limit) } });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to fetch orders" });
+    const orders = await Order.find()
+      .populate("user batch materials")
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, data: orders });
+
+  } catch {
+    res.status(500).json({ success: false });
   }
 };
 
 /* =====================================
-   🗑️ DELETE MATERIAL (Admin)
+   🗑️ DELETE MATERIAL
 ===================================== */
 export const deleteMaterial = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: "Invalid ID" });
+
+    if (!mongoose.Types.ObjectId.isValid(id))
+      return res.status(400).json({ success: false });
+
     await Material.findByIdAndUpdate(id, { isActive: false });
-    res.json({ success: true, message: "Material deactivated" });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Server Error" });
+
+    res.json({ success: true });
+
+  } catch {
+    res.status(500).json({ success: false });
   }
 };
