@@ -24,7 +24,7 @@ export const adminLogin = async (req, res) => {
     }
 
     // find admin user
-    const admin = await User.findOne({ email, role: "admin" });
+    const admin = await User.findOne({ email, role: "admin" }).select("+password");
     if (!admin) {
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
