@@ -46,13 +46,14 @@ streamSchema.index(
 /* =====================================
    🔥 CLEAN DATA (IMPORTANT)
 ===================================== */
-streamSchema.pre("save", function (next) {
-
+streamSchema.pre("save", async function () {
+  // ...
+});
   if (this.name) {
     this.name = this.name.trim().toUpperCase(); // 🔥 FIX: consistent format
   }
 
-  next();
+
 });
 
 /* =====================================
