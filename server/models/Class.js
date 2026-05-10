@@ -66,7 +66,7 @@ const classSchema = new mongoose.Schema(
    🔥 AUTO LOGIC
 ===================================== */
 
-classSchema.pre("save", function (next) {
+classSchema.pre("save", async function () {
 
   /* 🔹 CLEAN NAME */
   if (this.name) {
@@ -81,7 +81,7 @@ classSchema.pre("save", function (next) {
     this.order = this.classNumber;
   }
 
-  next();
+  
 });
 
 
