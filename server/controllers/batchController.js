@@ -62,9 +62,13 @@ export const createBatch = async (req, res) => {
 
     /* 🖼 UPLOAD THUMBNAIL */
     if (req.file) {
-      const result = await uploadThumbnail(req.file.buffer);
-      thumbnailUrl = result.secure_url;
-      thumbnailId = result.public_id;
+      try {
+        const result = await uploadThumbnail(req.file.buffer);
+        thumbnailUrl = result.secure_url;
+        thumbnailId = result.public_id;
+      } catch (uploadErr) {
+        console.error("Thumbnail upload failed:", uploadErr.message);
+      }
     }
 
     const batch = await Batch.create({
