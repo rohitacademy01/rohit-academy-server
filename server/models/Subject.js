@@ -92,10 +92,9 @@ subjectSchema.pre("save", function (next) {
 
   /* 🔥 STREAM VALIDATION (IMPORTANT) */
   if (!this.streamId && this.stream !== "General") {
-    return next(new Error("Stream ID required for this subject"));
-  }
+    throw new Error("Stream ID required for this subject");
 
-  next();
+  
 });
 
 /* =====================================
