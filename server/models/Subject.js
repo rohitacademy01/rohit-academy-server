@@ -94,6 +94,7 @@ subjectSchema.pre("save", async function () {
   if (!this.streamId && this.stream !== "General") {
     throw new Error("Stream ID required for this subject");
 
+  }
   
 });
 
