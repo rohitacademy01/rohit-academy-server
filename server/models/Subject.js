@@ -83,7 +83,7 @@ subjectSchema.index({ classId: 1, streamId: 1, order: 1 });
 /* =====================================
    🔥 PRE-SAVE CLEAN + VALIDATION
 ===================================== */
-subjectSchema.pre("save", function (next) {
+subjectSchema.pre("save", async function () {
 
   /* 🔹 NAME CLEAN */
   if (this.name) {
