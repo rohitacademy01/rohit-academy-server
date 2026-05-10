@@ -47,12 +47,10 @@ streamSchema.index(
    🔥 CLEAN DATA (IMPORTANT)
 ===================================== */
 streamSchema.pre("save", async function () {
-  // ...
-});
   if (this.name) {
-    this.name = this.name.trim().toUpperCase(); // 🔥 FIX: consistent format
+    this.name = this.name.trim().toUpperCase();
   }
-
+});
 
 });
 
