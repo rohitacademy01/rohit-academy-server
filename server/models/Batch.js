@@ -111,14 +111,13 @@ const batchSchema = new mongoose.Schema(
 /* =====================================
    🔥 SLUG AUTO GENERATE
 ===================================== */
-batchSchema.pre("save", function (next) {
+batchSchema.pre("save", async function () {
   if (this.isModified("name")) {
     this.slug = slugify(this.name, {
       lower: true,
       strict: true,
     }) + "-" + Date.now();
   }
-  next();
 });
 
 /* =====================================
