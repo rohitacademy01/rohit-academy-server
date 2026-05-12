@@ -211,6 +211,8 @@ export const updateBatch = async (req, res) => {
     }
 
     /* 🔹 CLEAN UPDATES */
+    if (updates.streamId === "" || updates.streamId === "null") updates.streamId = null;
+    if (updates.classId === "" || updates.classId === "null") updates.classId = null;
     if (updates.price !== undefined) updates.price = Number(updates.price);
     if (updates.originalPrice !== undefined) updates.originalPrice = Number(updates.originalPrice);
     if (updates.isFeatured !== undefined) {
