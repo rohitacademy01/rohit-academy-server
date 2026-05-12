@@ -21,6 +21,9 @@ if (isCloudinaryConfigured) {
   });
 
   console.log("☁️ Cloudinary initialized");
+  console.log("🔑 Cloud:", process.env.CLOUDINARY_CLOUD_NAME);
+console.log("🔑 Key length:", process.env.CLOUDINARY_API_KEY?.length);
+console.log("🔑 Secret length:", process.env.CLOUDINARY_API_SECRET?.length);
 
 } else {
 
