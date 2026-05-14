@@ -276,24 +276,19 @@ export const streamPDF = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id;
     const { id } = req.params;
-
     const pdf = await PDF.findById(id).lean();
     if (!pdf) return res.status(404).json({ success: false, message: "PDF not found" });
-
     const order = await Order.findOne({ user: userId, batch: pdf.batchId, status: "paid" }).lean();
     if (!order) return res.status(403).json({ success: false, message: "Purchase required" });
-
     const signedUrl = getSignedUrl(pdf.cloudinaryId, pdf.fileUrl);
     const axios = (await import("axios")).default;
     const response = await axios.get(signedUrl, { responseType: "stream" });
-
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", "inline; filename=" + pdf.title + ".pdf");
+    res.setHeader("Content-Disposition", "inline");
     res.setHeader("Cache-Control", "private, max-age=3600");
-
     response.data.pipe(res);
   } catch (err) {
-    logger.error(❌ streamPDF: ${err.message});
+    logger.error("streamPDF error: " + err.message);
     return res.status(500).json({ success: false, message: "Stream failed" });
   }
 };
