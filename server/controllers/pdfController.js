@@ -268,3 +268,33 @@ export const deletePDF = async (req, res) => {
     return res.status(500).json({ success: false, message: "Delete failed" });
   }
 };
+
+/* =====================================
+   📺 STREAM PDF INLINE  GET /api/pdf/stream/:id
+===================================== */
+export const streamPDF = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    const { id } = req.params;
+
+    const pdf = await PDF.findById(id).lean();
+    if (!pdf) return res.status(404).json({ success: false, message: "PDF not found" });
+
+    const order = await Order.findOne({ user: userId, batch: pdf.batchId, status: "paid" }).lean();
+    if (!order) return res.status(403).json({ success: false, message: "Purchase required" });
+
+    const signedUrl = getSignedUrl(pdf.cloudinaryId, pdf.fileUrl);
+    const response = await fetch(signedUrl);
+    if (!response.ok) return res.status(502).json({ success: false, message: "File fetch failed" });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", inline; filename="${pdf.title}.pdf");
+    res.setHeader("Cache-Control", "private, max-age=3600");
+
+    const { Readable } = await import("stream");
+    Readable.fromWeb(response.body).pipe(res);
+  } catch (err) {
+    logger.error(❌ streamPDF: ${err.message});
+    return res.status(500).json({ success: false, message: "Stream failed" });
+  }
+};
