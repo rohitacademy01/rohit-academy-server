@@ -284,15 +284,14 @@ export const streamPDF = async (req, res) => {
     if (!order) return res.status(403).json({ success: false, message: "Purchase required" });
 
     const signedUrl = getSignedUrl(pdf.cloudinaryId, pdf.fileUrl);
-    const response = await fetch(signedUrl);
-    if (!response.ok) return res.status(502).json({ success: false, message: "File fetch failed" });
+    const axios = (await import("axios")).default;
+    const response = await axios.get(signedUrl, { responseType: "stream" });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", inline; filename="${pdf.title}.pdf");
     res.setHeader("Cache-Control", "private, max-age=3600");
 
-    const { Readable } = await import("stream");
-    Readable.fromWeb(response.body).pipe(res);
+    response.data.pipe(res);
   } catch (err) {
     logger.error(❌ streamPDF: ${err.message});
     return res.status(500).json({ success: false, message: "Stream failed" });
