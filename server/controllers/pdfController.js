@@ -288,7 +288,7 @@ export const streamPDF = async (req, res) => {
     const response = await axios.get(signedUrl, { responseType: "stream" });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", inline; filename="${pdf.title}.pdf");
+    res.setHeader("Content-Disposition", "inline; filename=" + pdf.title + ".pdf");
     res.setHeader("Cache-Control", "private, max-age=3600");
 
     response.data.pipe(res);
