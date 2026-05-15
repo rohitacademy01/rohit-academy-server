@@ -5,6 +5,7 @@ import {
   Clock, BookOpen, X, Loader2, AlertCircle, Sparkles
 } from "lucide-react";
 import { getPDFsBySubject } from "../services/pdfService";
+import API from "../services/api";
 
 /* =====================================
    CONSTANTS
@@ -26,9 +27,9 @@ const CATEGORY_COLORS = {
 
 const formatFileSize = (bytes) => {
   if (!bytes) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 };
 
 const formatDate = (dateStr) => {
@@ -41,7 +42,7 @@ const formatDate = (dateStr) => {
 /* =====================================
    PDF CARD
 ===================================== */
-function PDFCard({ pdf, onPreview }) {
+function PDFCard({ pdf, onPreview, previewLoading }) {
   const cat = CATEGORY_COLORS[pdf.category] || CATEGORY_COLORS.notes;
   const label = TABS.find((t) => t.key === pdf.category)?.label || pdf.category;
 
@@ -55,8 +56,8 @@ function PDFCard({ pdf, onPreview }) {
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2">{pdf.title}</h3>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full ${cat.bg} ${cat.text}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${cat.dot}`} />
+            <span className={"inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full " + cat.bg + " " + cat.text}>
+              <span className={"w-1.5 h-1.5 rounded-full " + cat.dot} />
               {label}
             </span>
           </div>
@@ -75,11 +76,11 @@ function PDFCard({ pdf, onPreview }) {
       {/* Actions */}
       <div className="flex gap-2 mt-auto">
         <button
-        // BADLO IS SE:
-        onClick={() => window.open(pdf.fileUrl, "_blank")}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 text-xs font-medium transition"
+          onClick={() => onPreview(pdf)}
+          disabled={previewLoading}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 text-xs font-medium transition disabled:opacity-50"
         >
-          <Eye size={13} /> Preview
+          {previewLoading ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />} Preview
         </button>
         <a
           href={pdf.fileUrl}
@@ -116,7 +117,6 @@ function PreviewModal({ url, onClose }) {
           <div className="flex items-center gap-2">
             <a
               href={url}
-              download
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-1.5 text-xs font-medium bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition"
@@ -133,7 +133,7 @@ function PreviewModal({ url, onClose }) {
         </div>
         <div className="flex-1 overflow-hidden">
           <iframe
-            src={url}  
+            src={url}
             className="w-full h-full border-0"
             title="PDF Preview"
           />
@@ -186,8 +186,22 @@ function SubjectPDFs() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({});
+
+  const handlePreview = async (pdf) => {
+    try {
+      setPreviewLoading(true);
+      const res = await API.get("/pdf/stream/" + pdf._id, { responseType: "blob" });
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      setPreviewUrl(URL.createObjectURL(blob));
+    } catch (e) {
+      alert("PDF load failed. Please try Download instead.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   const fetchPDFs = useCallback(async () => {
     if (!batchId) {
@@ -221,7 +235,6 @@ function SubjectPDFs() {
     fetchPDFs();
   }, [fetchPDFs]);
 
-  /* reset page when tab/search changes */
   useEffect(() => {
     setPage(1);
   }, [activeTab, search]);
@@ -237,7 +250,6 @@ function SubjectPDFs() {
     setSearchInput("");
   };
 
-  /* ---- COUNTS PER TAB ---- */
   const tabCounts = pdfs.reduce((acc, p) => {
     acc[p.category] = (acc[p.category] || 0) + 1;
     return acc;
@@ -317,15 +329,15 @@ function SubjectPDFs() {
             <button
               key={tab.key}
               onClick={() => handleTabChange(tab.key)}
-              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              className={"flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all " + (
                 activeTab === tab.key
                   ? "bg-blue-600 text-white shadow-sm"
                   : "bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800"
-              }`}
+              )}
             >
               {tab.label}
               {tab.key !== "all" && tabCounts[tab.key] > 0 && (
-                <span className={`ml-1.5 text-xs ${activeTab === tab.key ? "opacity-80" : "text-gray-400"}`}>
+                <span className={"ml-1.5 text-xs " + (activeTab === tab.key ? "opacity-80" : "text-gray-400")}>
                   ({tabCounts[tab.key]})
                 </span>
               )}
@@ -346,10 +358,10 @@ function SubjectPDFs() {
             <p className="text-gray-500 mb-2">{error}</p>
             {error.includes("Purchase") && (
               <Link
-                to={`/batches`}
+                to={"/batches"}
                 className="text-blue-600 text-sm font-medium hover:underline"
               >
-                ← Browse Batches
+                Back to Batches
               </Link>
             )}
           </div>
@@ -360,7 +372,7 @@ function SubjectPDFs() {
             </div>
             <p className="text-gray-500 font-medium">No PDFs found</p>
             <p className="text-gray-400 text-sm mt-1">
-              {search ? `No results for "${search}"` : "No materials uploaded yet"}
+              {search ? "No results for " + search : "No materials uploaded yet"}
             </p>
           </div>
         ) : (
@@ -373,7 +385,7 @@ function SubjectPDFs() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {pdfs.map((pdf) => (
-                <PDFCard key={pdf._id} pdf={pdf} onPreview={setPreviewUrl} />
+                <PDFCard key={pdf._id} pdf={pdf} onPreview={handlePreview} previewLoading={previewLoading} />
               ))}
             </div>
 
@@ -396,11 +408,11 @@ function SubjectPDFs() {
                       )}
                       <button
                         onClick={() => setPage(p)}
-                        className={`w-9 h-9 rounded-xl text-sm font-medium transition ${
+                        className={"w-9 h-9 rounded-xl text-sm font-medium transition " + (
                           p === page
                             ? "bg-blue-600 text-white"
                             : "border border-gray-200 hover:bg-gray-50 text-gray-700"
-                        }`}
+                        )}
                       >
                         {p}
                       </button>
@@ -421,7 +433,7 @@ function SubjectPDFs() {
 
       {/* Preview Modal */}
       {previewUrl && (
-        <PreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+        <PreviewModal url={previewUrl} onClose={() => { setPreviewUrl(null); }} />
       )}
     </div>
   );
