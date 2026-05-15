@@ -133,7 +133,7 @@ function PreviewModal({ url, onClose }) {
         </div>
         <div className="flex-1 overflow-hidden">
           <iframe
-            src={url}
+            src={url}  
             className="w-full h-full border-0"
             title="PDF Preview"
           />
