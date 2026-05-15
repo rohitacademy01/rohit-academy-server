@@ -76,7 +76,7 @@ function PDFCard({ pdf, onPreview }) {
       <div className="flex gap-2 mt-auto">
         <button
         // BADLO IS SE:
-        onClick={() => onPreview("https://docs.google.com/viewer?url=" + encodeURIComponent(pdf.fileUrl) + "&embedded=true")}
+        onClick={() => window.open(pdf.fileUrl, "_blank")}
           className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 text-xs font-medium transition"
         >
           <Eye size={13} /> Preview
