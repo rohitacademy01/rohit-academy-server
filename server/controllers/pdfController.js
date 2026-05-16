@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
 import PDF from "../models/PDF.js";
 import Batch from "../models/Batch.js";
 import Subject from "../models/Subject.js";
@@ -8,8 +9,7 @@ import streamifier from "streamifier";
 import logger from "../utils/logger.js";
 
 /* =====================================
-   🔐 GENERATE SIGNED URL (1-hour expiry)
-   Prevents direct Cloudinary URL access without auth
+   GENERATE SIGNED URL (1-hour expiry)
 ===================================== */
 const getSignedUrl = (cloudinaryId, fallbackUrl) => {
   if (!cloudinaryId) return fallbackUrl || "";
@@ -17,21 +17,21 @@ const getSignedUrl = (cloudinaryId, fallbackUrl) => {
     return cloudinary.url(cloudinaryId, {
       resource_type: "raw",
       sign_url: true,
-      expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
       secure: true,
     });
   } catch (err) {
-    logger.error(`❌ Signed URL generation failed: ${err.message}`);
+    logger.error("Signed URL generation failed: " + err.message);
     return fallbackUrl || "";
   }
 };
 
 /* =====================================
-   ☁️ CLOUDINARY HELPERS
+   CLOUDINARY HELPERS
 ===================================== */
 const uploadToCloudinary = (buffer) =>
   new Promise((resolve, reject) => {
-    const safeName = `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const safeName = "pdf-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
     const stream = cloudinary.uploader.upload_stream(
       {
         resource_type: "raw",
@@ -49,12 +49,12 @@ const deleteFromCloudinary = async (cloudinaryId) => {
   try {
     await cloudinary.uploader.destroy(cloudinaryId, { resource_type: "raw" });
   } catch (err) {
-    logger.error(`❌ Cloudinary delete: ${err.message}`);
+    logger.error("Cloudinary delete: " + err.message);
   }
 };
 
 /* =====================================
-   ➕ UPLOAD PDF  POST /api/admin/pdf/upload
+   UPLOAD PDF  POST /api/admin/pdf/upload
 ===================================== */
 export const uploadPDF = async (req, res) => {
   try {
@@ -101,13 +101,13 @@ export const uploadPDF = async (req, res) => {
 
     return res.status(201).json({ success: true, message: "PDF uploaded successfully", pdf: newPDF });
   } catch (err) {
-    logger.error(`❌ uploadPDF: ${err.message}`);
+    logger.error("uploadPDF: " + err.message);
     return res.status(500).json({ success: false, message: "Upload failed" });
   }
 };
 
 /* =====================================
-   📄 GET PDFs BY SUBJECT  GET /api/pdf/:subjectId
+   GET PDFs BY SUBJECT  GET /api/pdf/:subjectId
 ===================================== */
 export const getPDFsBySubject = async (req, res) => {
   try {
@@ -164,13 +164,13 @@ export const getPDFsBySubject = async (req, res) => {
       pagination: { total, page: Number(page), limit: Number(limit), pages: Math.ceil(total / Number(limit)) },
     });
   } catch (err) {
-    logger.error(`❌ getPDFsBySubject: ${err.message}`);
+    logger.error("getPDFsBySubject: " + err.message);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 /* =====================================
-   📋 GET ALL PDFs (ADMIN)  GET /api/admin/pdf
+   GET ALL PDFs (ADMIN)  GET /api/admin/pdf
 ===================================== */
 export const getAllPDFs = async (req, res) => {
   try {
@@ -201,13 +201,13 @@ export const getAllPDFs = async (req, res) => {
       pagination: { total, page: Number(page), limit: Number(limit), pages: Math.ceil(total / Number(limit)) },
     });
   } catch (err) {
-    logger.error(`❌ getAllPDFs: ${err.message}`);
+    logger.error("getAllPDFs: " + err.message);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 /* =====================================
-   ✏️ UPDATE PDF  PUT /api/admin/pdf/:id
+   UPDATE PDF  PUT /api/admin/pdf/:id
 ===================================== */
 export const updatePDF = async (req, res) => {
   try {
@@ -241,13 +241,13 @@ export const updatePDF = async (req, res) => {
 
     return res.json({ success: true, message: "PDF updated successfully", pdf });
   } catch (err) {
-    logger.error(`❌ updatePDF: ${err.message}`);
+    logger.error("updatePDF: " + err.message);
     return res.status(500).json({ success: false, message: "Update failed" });
   }
 };
 
 /* =====================================
-   ❌ DELETE PDF  DELETE /api/admin/pdf/:id
+   DELETE PDF  DELETE /api/admin/pdf/:id
 ===================================== */
 export const deletePDF = async (req, res) => {
   try {
@@ -264,26 +264,84 @@ export const deletePDF = async (req, res) => {
 
     return res.json({ success: true, message: "PDF deleted successfully" });
   } catch (err) {
-    logger.error(`❌ deletePDF: ${err.message}`);
+    logger.error("deletePDF: " + err.message);
     return res.status(500).json({ success: false, message: "Delete failed" });
   }
 };
 
 /* =====================================
-   📺 STREAM PDF INLINE  GET /api/pdf/stream/:id
+   GENERATE PDF VIEW TOKEN  POST /api/pdf/token/:id
+   Frontend calls this with auth, gets back a short-lived URL
 ===================================== */
-export const streamPDF = async (req, res) => {
+export const generatePDFToken = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id;
     const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid PDF ID" });
+    }
+
     const pdf = await PDF.findById(id).lean();
     if (!pdf) return res.status(404).json({ success: false, message: "PDF not found" });
+
     const order = await Order.findOne({ user: userId, batch: pdf.batchId, status: "paid" }).lean();
     if (!order) return res.status(403).json({ success: false, message: "Purchase required" });
-    const signedUrl = getSignedUrl(pdf.cloudinaryId, pdf.fileUrl);
-    return res.redirect(signedUrl);
+
+    const token = jwt.sign(
+      { pdfId: id, userId: String(userId) },
+      process.env.JWT_SECRET,
+      { expiresIn: "10m" }
+    );
+
+    const baseUrl = process.env.BACKEND_URL || "https://rohit-academy-server-1.onrender.com";
+    const viewUrl = baseUrl + "/api/pdf/view/" + id + "?token=" + token;
+
+    return res.json({ success: true, url: viewUrl });
   } catch (err) {
-    logger.error("streamPDF error: " + err.message);
-    return res.status(500).json({ success: false, message: "Stream failed" });
+    logger.error("generatePDFToken: " + err.message);
+    return res.status(500).json({ success: false, message: "Token generation failed" });
+  }
+};
+
+/* =====================================
+   VIEW PDF INLINE  GET /api/pdf/view/:id?token=xxx
+   No auth middleware — token IS the auth
+   Opens in new tab, Android browser shows PDF
+===================================== */
+export const viewPDF = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { token } = req.query;
+
+    if (!token) return res.status(401).send("Token required");
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (e) {
+      return res.status(401).send("Token expired or invalid. Please go back and try again.");
+    }
+
+    if (decoded.pdfId !== id) return res.status(403).send("Invalid token");
+
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).send("Invalid PDF ID");
+
+    const pdf = await PDF.findById(id).lean();
+    if (!pdf) return res.status(404).send("PDF not found");
+
+    const signedUrl = getSignedUrl(pdf.cloudinaryId, pdf.fileUrl);
+
+    const axios = (await import("axios")).default;
+    const response = await axios.get(signedUrl, { responseType: "stream" });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "inline; filename=" + pdf.title + ".pdf");
+    res.setHeader("Cache-Control", "private, max-age=600");
+
+    response.data.pipe(res);
+  } catch (err) {
+    logger.error("viewPDF: " + err.message);
+    return res.status(500).send("Failed to load PDF");
   }
 };
