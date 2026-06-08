@@ -1,5 +1,5 @@
 import express from "express";
-import { adminLogin } from "../controllers/adminController.js";
+import { adminLogin } from "../controllers/authController.js";
 import { authLimiter } from "../middleware/rateLimitMiddleware.js";
 
 const router = express.Router();
