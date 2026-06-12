@@ -21,7 +21,7 @@ export const addClass = async (req, res) => {
     let autoHasStreams = hasStreams === true || hasStreams === "true";
     let autoOrder = Number(order) || 0;
 
-    /* SCHOOL TYPE VALIDATION - Accept both numeric (1-12) and text (BA, BSc, BCom) */
+    /* SCHOOL TYPE VALIDATION */
     if (type === "school") {
       // Check if it's a numeric class
       const num = Number(name);
@@ -45,10 +45,17 @@ export const addClass = async (req, res) => {
         autoHasStreams = true; // Degree programs typically require streams
         autoOrder = 100 + name.charCodeAt(0); // Sort after numeric classes
       }
-    } else {
+    } else if (type === "college" || type === "professional") {
       /* COLLEGE / PROFESSIONAL */
+      // Validate alphanumeric format
+      if (!/^[a-z0-9]+$/.test(name)) {
+        return res.status(400).json({ success: false, message: "Name must be alphanumeric" });
+      }
       displayName = name.toUpperCase() === name ? name : name.charAt(0).toUpperCase() + name.slice(1);
-      if (!autoOrder) autoOrder = 100;
+      autoHasStreams = true; // College and professional courses typically require streams/specializations
+      if (!autoOrder) autoOrder = 100 + name.charCodeAt(0);
+    } else {
+      return res.status(400).json({ success: false, message: "Invalid class type" });
     }
 
     /* DUPLICATE CHECK */
@@ -174,13 +181,19 @@ export const updateClass = async (req, res) => {
           classDoc.hasStreams = true; // Degree programs typically require streams
           classDoc.order = 100 + newName.charCodeAt(0);
         }
-      } else {
+      } else if (classDoc.type === "college" || classDoc.type === "professional") {
+        // Validate alphanumeric format
+        if (!/^[a-z0-9]+$/.test(newName)) {
+          return res.status(400).json({ success: false, message: "Name must be alphanumeric" });
+        }
         const exists = await Class.findOne({ name: newName, isActive: true });
         if (exists && exists._id.toString() !== req.params.id) {
           return res.status(400).json({ success: false, message: "Name already exists" });
         }
         classDoc.name = newName;
-        classDoc.displayName = newName.charAt(0).toUpperCase() + newName.slice(1);
+        classDoc.displayName = newName.toUpperCase() === newName ? newName : newName.charAt(0).toUpperCase() + newName.slice(1);
+        classDoc.hasStreams = true;
+        classDoc.order = 100 + newName.charCodeAt(0);
       }
     }
 
