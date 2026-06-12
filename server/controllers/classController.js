@@ -21,17 +21,30 @@ export const addClass = async (req, res) => {
     let autoHasStreams = hasStreams === true || hasStreams === "true";
     let autoOrder = Number(order) || 0;
 
-    /* SCHOOL TYPE VALIDATION */
+    /* SCHOOL TYPE VALIDATION - Accept both numeric (1-12) and text (BA, BSc, BCom) */
     if (type === "school") {
-      const num = Number(name.replace(/[^\d]/g, ""));
-      if (!num || num < 1 || num > 12) {
-        return res.status(400).json({ success: false, message: "School class must be between 1 and 12" });
+      // Check if it's a numeric class
+      const num = Number(name);
+      const isNumeric = !isNaN(num) && Number.isInteger(num) && num >= 1 && num <= 12;
+      
+      if (isNumeric) {
+        // Numeric class: 1-12
+        classNumber = num;
+        name = String(num);
+        displayName = "Class " + num;
+        autoHasStreams = num >= 11;
+        autoOrder = num;
+      } else {
+        // Text class: BA, BSc, BCom, etc.
+        // Validate alphanumeric format
+        if (!/^[a-z0-9]+$/.test(name)) {
+          return res.status(400).json({ success: false, message: "Class must be alphanumeric (e.g., 1-12, BA, BSc, BCom)" });
+        }
+        classNumber = null;
+        displayName = name.toUpperCase();
+        autoHasStreams = true; // Degree programs typically require streams
+        autoOrder = 100 + name.charCodeAt(0); // Sort after numeric classes
       }
-      classNumber = num;
-      name = String(num);
-      displayName = "Class " + num;
-      autoHasStreams = num >= 11;
-      autoOrder = num;
     } else {
       /* COLLEGE / PROFESSIONAL */
       displayName = name.toUpperCase() === name ? name : name.charAt(0).toUpperCase() + name.slice(1);
@@ -134,15 +147,33 @@ export const updateClass = async (req, res) => {
       const newName = name.trim().toLowerCase();
 
       if (classDoc.type === "school") {
-        const num = Number(newName.replace(/[^\d]/g, ""));
-        if (!num || num < 1 || num > 12) {
-          return res.status(400).json({ success: false, message: "School class must be between 1 and 12" });
+        // Check if it's a numeric class
+        const num = Number(newName);
+        const isNumeric = !isNaN(num) && Number.isInteger(num) && num >= 1 && num <= 12;
+        
+        if (isNumeric) {
+          // Numeric class: 1-12
+          classDoc.name = String(num);
+          classDoc.classNumber = num;
+          classDoc.displayName = "Class " + num;
+          classDoc.hasStreams = num >= 11;
+          classDoc.order = num;
+        } else {
+          // Text class: BA, BSc, BCom, etc.
+          // Validate alphanumeric format
+          if (!/^[a-z0-9]+$/.test(newName)) {
+            return res.status(400).json({ success: false, message: "Class must be alphanumeric" });
+          }
+          const exists = await Class.findOne({ name: newName, isActive: true });
+          if (exists && exists._id.toString() !== req.params.id) {
+            return res.status(400).json({ success: false, message: "Name already exists" });
+          }
+          classDoc.name = newName;
+          classDoc.classNumber = null;
+          classDoc.displayName = newName.toUpperCase();
+          classDoc.hasStreams = true; // Degree programs typically require streams
+          classDoc.order = 100 + newName.charCodeAt(0);
         }
-        classDoc.name = String(num);
-        classDoc.classNumber = num;
-        classDoc.displayName = "Class " + num;
-        classDoc.hasStreams = num >= 11;
-        classDoc.order = num;
       } else {
         const exists = await Class.findOne({ name: newName, isActive: true });
         if (exists && exists._id.toString() !== req.params.id) {
